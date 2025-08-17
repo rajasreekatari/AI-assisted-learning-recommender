@@ -257,13 +257,57 @@ async def get_ai_career_transition_insights(from_role: str, to_role: str):
         
         from models.ai_recommender import AIRecommender
         
-        ai_recommender = AIRecommender(use_local_model=True)
-        insights = ai_recommender.get_career_transition_insights(from_role, to_role)
+        ai_recommender = AIRecommender()
+        insights = ai_recommender.get_career_transition_path(from_role, to_role)
         
         return insights
         
     except Exception as e:
         return {"error": f"Failed to get career transition insights: {str(e)}"}
+
+@app.get("/career/transitions/advanced")
+async def get_advanced_career_transitions():
+    """Get advanced career transition matrix with difficulty levels"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+        
+        from models.skill_graph import SkillDependencyGraph
+        
+        skill_graph = SkillDependencyGraph()
+        transitions = skill_graph.get_advanced_career_transitions()
+        
+        return {
+            "message": "Advanced career transition matrix",
+            "transitions": transitions,
+            "total_paths": len(transitions)
+        }
+        
+    except Exception as e:
+        return {"error": f"Failed to get advanced career transitions: {str(e)}"}
+
+@app.get("/career/transitions/recommendations/{current_role}")
+async def get_transition_recommendations(current_role: str, experience_years: int = 2):
+    """Get personalized transition recommendations based on experience"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+        
+        from models.skill_graph import SkillDependencyGraph
+        
+        skill_graph = SkillDependencyGraph()
+        recommendations = skill_graph.get_transition_recommendations(current_role, experience_years)
+        
+        return {
+            "current_role": current_role,
+            "experience_years": experience_years,
+            "recommendations": recommendations
+        }
+        
+    except Exception as e:
+        return {"error": f"Failed to get transition recommendations: {str(e)}"}
 
 @app.get("/ai/detailed-plan/{path_id}")
 async def get_detailed_ai_plan(path_id: str):
