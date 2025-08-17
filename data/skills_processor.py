@@ -205,35 +205,71 @@ def main():
                 
             print(f"\n🔍 Processing {name}...")
             
-            # Filter tech jobs (adjust column names based on your data)
-            if 'job_title' in df.columns:
-                tech_jobs = processor.filter_tech_jobs(df, 'job_title')
-            elif 'title' in df.columns:
-                tech_jobs = processor.filter_tech_jobs(df, 'title')
-            else:
-                print(f"No job title column found in {name}")
-                continue
-            
-            # Extract skills
-            if 'job_skills' in df.columns:
-                processed_df = processor.process_job_skills(tech_jobs, 'job_skills')
-            elif 'skills' in df.columns:
-                processed_df = processor.process_job_skills(tech_jobs, 'skills')
-            else:
-                print(f"No skills column found in {name}")
-                processed_df = tech_jobs
-            
-            processed_data[name] = processed_df
-            
-            # Save processed data
-            output_file = f"data/processed_{name}.csv"
-            processor.save_processed_data(processed_df, output_file)
+            # Handle different dataset types
+            if name == 'job_skills':
+                # This dataset has skills but no job titles
+                # We'll need to join it with linkedin_jobs to get job titles
+                print("Processing job_skills dataset (skills only)")
+                if 'job_skills' in df.columns:
+                    processed_df = processor.process_job_skills(df, 'job_skills')
+                    processed_data[name] = processed_df
+                    
+                    # Save processed data
+                    output_file = f"data/processed_{name}.csv"
+                    processor.save_processed_data(processed_df, output_file)
+                else:
+                    print(f"No skills column found in {name}")
+                    
+            elif name == 'linkedin_jobs':
+                # This dataset has job titles but no skills
+                print("Processing linkedin_jobs dataset (job titles only)")
+                if 'job_title' in df.columns:
+                    tech_jobs = processor.filter_tech_jobs(df, 'job_title')
+                    processed_data[name] = tech_jobs
+                    
+                    # Save processed data
+                    output_file = f"data/processed_{name}.csv"
+                    processor.save_processed_data(tech_jobs, output_file)
+                else:
+                    print(f"No job title column found in {name}")
+                    
+            elif name == 'job_summary':
+                # This dataset has job descriptions
+                print("Processing job_summary dataset (job descriptions)")
+                if 'job_summary' in df.columns:
+                    # Extract skills from job summaries
+                    df['extracted_skills'] = df['job_summary'].apply(processor.extract_skills_from_text)
+                    df['skills_count'] = df['extracted_skills'].apply(len)
+                    
+                    # Filter jobs with tech skills
+                    df_with_skills = df[df['skills_count'] > 0].copy()
+                    processed_data[name] = df_with_skills
+                    
+                    # Save processed data
+                    output_file = f"data/processed_{name}.csv"
+                    processor.save_processed_data(df_with_skills, output_file)
+                else:
+                    print(f"No job summary column found in {name}")
         
         # Create combined analysis
         print("\n📈 Creating combined skills analysis...")
         if processed_data:
             # Combine all processed data
             combined_df = pd.concat(processed_data.values(), ignore_index=True)
+            
+            # Ensure we have the required columns for analysis
+            if 'extracted_skills' not in combined_df.columns:
+                print("Creating extracted_skills column from available data...")
+                if 'job_skills' in combined_df.columns:
+                    combined_df['extracted_skills'] = combined_df['job_skills'].apply(processor.extract_skills_from_text)
+                elif 'job_summary' in combined_df.columns:
+                    combined_df['extracted_skills'] = combined_df['job_summary'].apply(processor.extract_skills_from_text)
+                else:
+                    print("No skills data available for analysis")
+                    return
+                
+                combined_df['skills_count'] = combined_df['extracted_skills'].apply(len)
+            
             combined_analysis = processor.create_skills_analysis(combined_df)
             
             # Save analysis
@@ -243,6 +279,11 @@ def main():
             print(f"📊 Total tech jobs processed: {len(combined_df)}")
             print(f"🛠️ Total skills extracted: {combined_analysis['skills_distribution']['total_skills_found']}")
             print(f"📁 Output files saved in 'data/' directory")
+            
+            # Show some sample data
+            print(f"\n📋 Sample of processed data:")
+            print(f"Columns: {combined_df.columns.tolist()}")
+            print(f"Sample skills: {combined_df['extracted_skills'].head(3).tolist()}")
         
     except Exception as e:
         print(f"❌ Error during processing: {str(e)}")
