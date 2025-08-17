@@ -130,10 +130,6 @@ The system includes a data processor (`data/skills_processor.py`) that:
 
 This is a personal project showcasing skills in Data Engineering, Software Development, and Gen AI integration.
 
-## 📝 License
-
-MIT License
-
 ## 🔮 Roadmap
 
 - [ ] Integrate HuggingFace models for AI recommendations
