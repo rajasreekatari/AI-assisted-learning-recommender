@@ -22,17 +22,35 @@ def check_api_health():
     except:
         return False
 
-def create_user_profile(current_skills: List[str], target_role: str, experience_level: str, learning_goals: List[str] = None):
+def create_user(username: str, email: str, experience_level: str, target_role: str):
+    """Create a user via API"""
+    try:
+        user_data = {
+            "username": username,
+            "email": email,
+            "experience_level": experience_level,
+            "target_role": target_role
+        }
+        
+        response = requests.post(f"{API_BASE_URL}/user/create", json=user_data)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"Error creating user: {response.text}")
+            return None
+    except Exception as e:
+        st.error(f"Error connecting to API: {str(e)}")
+        return None
+
+def create_user_profile(user_id: int, current_skills: List[str], learning_goals: List[str] = None):
     """Create a user profile via API"""
     try:
         profile_data = {
             "current_skills": current_skills,
-            "target_role": target_role,
-            "experience_level": experience_level,
             "learning_goals": learning_goals or []
         }
         
-        response = requests.post(f"{API_BASE_URL}/profile/create", json=profile_data)
+        response = requests.post(f"{API_BASE_URL}/profile/create?user_id={user_id}", json=profile_data)
         if response.status_code == 200:
             return response.json()
         else:
@@ -42,10 +60,10 @@ def create_user_profile(current_skills: List[str], target_role: str, experience_
         st.error(f"Error connecting to API: {str(e)}")
         return None
 
-def get_learning_path(profile_data: Dict[str, Any]):
+def get_learning_path(user_id: int, profile_data: Dict[str, Any]):
     """Get learning path recommendations via API"""
     try:
-        response = requests.post(f"{API_BASE_URL}/recommend/path", json=profile_data)
+        response = requests.post(f"{API_BASE_URL}/recommend/path?user_id={user_id}", json=profile_data)
         if response.status_code == 200:
             return response.json()
         else:
@@ -145,6 +163,19 @@ def show_create_profile_page():
     with st.form("user_profile_form"):
         st.subheader("Tell us about yourself")
         
+        # User information
+        username = st.text_input(
+            "**Username:**",
+            placeholder="e.g., john_doe",
+            help="Choose a unique username for your account"
+        )
+        
+        email = st.text_input(
+            "**Email:**",
+            placeholder="e.g., john@example.com",
+            help="Your email address"
+        )
+        
         # Current skills input
         st.write("**What skills do you currently have?**")
         current_skills = st.text_area(
@@ -177,31 +208,44 @@ def show_create_profile_page():
         submitted = st.form_submit_button("🚀 Create Profile & Get Recommendations")
         
         if submitted:
-            if not current_skills or not target_role:
-                st.error("Please fill in your current skills and target role!")
+            if not username or not email or not current_skills or not target_role:
+                st.error("Please fill in all required fields!")
                 return
             
             # Process skills input
             skills_list = [skill.strip() for skill in current_skills.replace('\n', ',').split(',') if skill.strip()]
             goals_list = [goal.strip() for goal in learning_goals.replace('\n', ',').split(',') if goal.strip()] if learning_goals else []
             
-            # Create profile
-            with st.spinner("Creating your profile..."):
-                profile_result = create_user_profile(skills_list, target_role, experience_level, goals_list)
+            # Create user first
+            with st.spinner("Creating your account..."):
+                user_result = create_user(username, email, experience_level, target_role)
             
-            if profile_result:
-                st.success("✅ Profile created successfully!")
-                st.session_state['user_profile'] = profile_result
-                st.session_state['profile_data'] = {
-                    "current_skills": skills_list,
-                    "target_role": target_role,
-                    "experience_level": experience_level,
-                    "learning_goals": goals_list
-                }
+            if user_result:
+                user_id = user_result['user_id']
+                st.success("✅ Account created successfully!")
                 
-                # Auto-navigate to recommendations
-                st.info("🎯 Now let's get your personalized learning path!")
-                st.balloons()
+                # Create user profile
+                with st.spinner("Creating your learning profile..."):
+                    profile_result = create_user_profile(user_id, skills_list, goals_list)
+                
+                if profile_result:
+                    st.success("✅ Learning profile created successfully!")
+                    st.session_state['user_id'] = user_id
+                    st.session_state['user_profile'] = profile_result
+                    st.session_state['profile_data'] = {
+                        "current_skills": skills_list,
+                        "target_role": target_role,
+                        "experience_level": experience_level,
+                        "learning_goals": goals_list
+                    }
+                    
+                    # Auto-navigate to recommendations
+                    st.info("🎯 Now let's get your personalized learning path!")
+                    st.balloons()
+                else:
+                    st.error("Failed to create learning profile. Please try again.")
+            else:
+                st.error("Failed to create account. Please try again.")
 
 def show_recommendations_page():
     st.header("🎯 Your Personalized Learning Path")
@@ -232,8 +276,12 @@ def show_recommendations_page():
     
     # Get recommendations
     if st.button("🔄 Get Updated Recommendations"):
+        if 'user_id' not in st.session_state:
+            st.error("User ID not found. Please create a profile first.")
+            return
+            
         with st.spinner("Generating your personalized learning path..."):
-            recommendations = get_learning_path(profile_data)
+            recommendations = get_learning_path(st.session_state['user_id'], profile_data)
         
         if recommendations:
             st.session_state['recommendations'] = recommendations
@@ -285,31 +333,44 @@ def display_recommendations(recommendations: Dict[str, Any]):
 def show_tech_skills_page():
     st.header("🛠️ Technology Skills Taxonomy")
     
-    taxonomy = get_tech_taxonomy()
+    with st.spinner("Loading skills taxonomy..."):
+        taxonomy = get_tech_taxonomy()
+    
     if not taxonomy:
         st.error("Could not fetch skills taxonomy. Please check if the backend is running.")
         return
+    
+
     
     # Display skills by category
     for category, skills in taxonomy.items():
         st.subheader(f"**{category.replace('_', ' ').title()}**")
         
-        # Create columns for better layout
-        cols = st.columns(3)
-        for i, skill in enumerate(skills):
-            col_idx = i % 3
-            with cols[col_idx]:
-                st.write(f"• {skill}")
+        # Check if skills is a list
+        if isinstance(skills, list):
+            # Create columns for better layout
+            cols = st.columns(3)
+            for i, skill in enumerate(skills):
+                col_idx = i % 3
+                with cols[col_idx]:
+                    st.write(f"• {skill}")
+        else:
+            st.write(f"⚠️ Skills for {category} is not a list: {type(skills)}")
+            st.write(f"Content: {skills}")
         
         st.divider()
 
 def show_career_paths_page():
     st.header("🚀 Career Transition Paths")
     
-    career_paths = get_career_paths()
+    with st.spinner("Loading career paths..."):
+        career_paths = get_career_paths()
+    
     if not career_paths:
         st.error("Could not fetch career paths. Please check if the backend is running.")
         return
+    
+
     
     # Display each career path
     for path_key, path_info in career_paths.items():
@@ -318,8 +379,11 @@ def show_career_paths_page():
             st.write(f"**Estimated Time:** {path_info['estimated_time']}")
             
             st.write("**Key Skills to Learn:**")
-            for skill in path_info['key_skills_to_learn']:
-                st.write(f"• {skill}")
+            if isinstance(path_info['key_skills_to_learn'], list):
+                for skill in path_info['key_skills_to_learn']:
+                    st.write(f"• {skill}")
+            else:
+                st.write(f"⚠️ Key skills is not a list: {path_info['key_skills_to_learn']}")
             
             st.divider()
 
