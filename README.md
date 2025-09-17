@@ -1,143 +1,225 @@
-# AI-Assisted Learning Recommender
+# Learning Recommender Platform
 
-A personalized learning path recommender system that helps tech professionals navigate career transitions and skill gaps using Gen AI.
+An AI-assisted learning recommender for tech professionals, built with platform engineering practices: FastAPI backend, Streamlit frontend, Snowflake-backed persistence, CI/CD, containerization, observability, and Kubernetes manifests. Includes lightweight MLOps (model versioning, tracking, deployment helpers) and an optional real-time prediction service scaffold.
 
-## 🎯 Problem Solved
+## Features
 
-Professionals with career transitions and gaps struggle with personalized upskilling paths. This system creates custom learning plans by analyzing user profiles and recommending relevant resources.
+- **Personalized Learning Plans**: AI and rule-based plans using transformers and a skill dependency graph
+- **REST API**: FastAPI endpoints for users, profiles, learning paths, and skill graph queries
+- **Database Integration**: SQLAlchemy ORM targeting Snowflake
+- **Frontend**: Streamlit UI for profile creation and recommendations
+- **Observability (lightweight)**: Prometheus `/metrics`, basic request counters and latency histograms
+- **Containerization**: Dockerfile + docker-compose for local dev
+- **CI/CD (lightweight)**: GitHub Actions for lint, type-check, and tests
+- **Kubernetes Manifests**: Minimal Deployment and Service for backend
+ - **MLOps**: MLflow/ClearML tracking, local model registry, deployment helper, metrics
 
-## 🏗️ Architecture
-
-- **Backend**: FastAPI with async processing
-- **Frontend**: Streamlit for rapid UI development
-- **Data Processing**: Pandas for ETL operations
-- **AI/ML**: HuggingFace transformers for personalized recommendations
-- **Database**: Snowflake for scalable data storage
-- **Deployment**: Docker containerization
-
-## 🚀 Features
-
-- **Skill Gap Analysis**: Identify missing skills for target roles
-- **Personalized Learning Paths**: AI-generated custom study plans
-- **Resource Recommendations**: Curated learning materials and courses
-- **Career Transition Support**: Specialized paths for DE→SDE, Frontend→Full Stack, etc.
-
-## 📁 Project Structure
+## Project Structure
 
 ```
-learning-recommender/
-├── backend/          # FastAPI backend
-│   └── main.py      # Main API endpoints
-├── frontend/         # Streamlit frontend
-│   └── app.py       # Main Streamlit application
-├── data/            # Data processing scripts
-│   ├── skills_processor.py  # Tech skills data processor
-│   └── .gitkeep     # Directory placeholder
-├── models/          # ML models and AI components
-│   └── .gitkeep     # Directory placeholder
-├── notebooks/       # Jupyter notebooks for exploration
-├── tests/           # Test suite
-├── requirements.txt # Python dependencies
-├── Dockerfile       # Docker configuration
-├── docker-compose.yml # Docker compose setup
-└── README.md        # Project documentation
+backend/                 # FastAPI backend
+frontend/                # Streamlit app
+models/                  # AI recommender, skill graph, DB models
+services/                # Database service and optional real-time service
+config/                  # Database configuration (Snowflake)
+k8s/                     # Minimal Kubernetes manifests
+.github/workflows/       # CI pipeline
+Dockerfile
+docker-compose.yml
+requirements.txt
 ```
 
-## 🛠️ Tech Stack
+## Architecture
 
-- **Backend**: FastAPI, Uvicorn
-- **Frontend**: Streamlit
-- **Data**: Pandas, NumPy, Scikit-learn
-- **AI**: Transformers, PyTorch, Sentence-Transformers
-- **Database**: Snowflake, SQLAlchemy
-- **DevOps**: Docker, Git
+- **Backend (FastAPI)**: Exposes REST endpoints for users, profiles, learning paths, skills graph, health, and metrics.
+- **Models**:
+  - `models/ai_recommender.py`: HuggingFace transformers-backed recommender with rule-based fallback.
+  - `models/skill_graph.py`: Graph-based dependencies for generating learning paths.
+  - `models/database_models.py`: SQLAlchemy ORM models.
+- **Data layer**:
+  - `services/database_service.py`: DB operations; uses `config/database.py` (Snowflake).
+- **MLOps**:
+  - `mlops/model_manager.py`: Register, track, deploy, and monitor models (MLflow, ClearML, Prometheus).
+- **Optional real-time service**: `services/real_time_prediction.py` async service with cache and Kafka-ready scaffold.
+- **Frontend**: `frontend/app.py` (Streamlit).
+- **Observability**: `/metrics` endpoint (Prometheus exposition format).
 
-## 🚀 Getting Started
+## Prerequisites
 
-### Prerequisites
 - Python 3.11+
-- Docker (optional)
+- Docker (for containerized run)
+- Optional: kubectl (for Kubernetes), MLflow/ClearML servers if you plan to use them
 
-### Local Development
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/rajasreekatari/AI-assisted-learning-recommender.git
-   cd AI-assisted-learning-recommender
-   ```
+## Setup & Configuration
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+- Snowflake credentials are configured via `config/database.py`. Set the password via env var.
 
-3. **Run the backend**
-   ```bash
-   uvicorn backend.main:app --reload
-   ```
-
-4. **Run the frontend**
-   ```bash
-   streamlit run frontend/app.py
-   ```
-
-### Docker Deployment
-1. **Build and run with Docker Compose**
-   ```bash
-   docker-compose up --build
-   ```
-
-2. **Access the application**
-   - Backend API: http://localhost:8000
-   - Frontend: http://localhost:8501
-   - API Docs: http://localhost:8000/docs
-
-## 📊 Data Sources
-
-- LinkedIn job postings (filtered for tech roles)
-- GitHub Jobs API
-- Stack Overflow job data
-- Custom tech skill taxonomy
-
-## 🔧 API Endpoints
-
-### Core Endpoints
-- `GET /` - API information
-- `GET /health` - Health check
-- `POST /profile/create` - Create user profile
-- `GET /profile/{profile_id}` - Get user profile
-- `POST /recommend/path` - Generate learning path
-
-### Data Endpoints
-- `GET /skills/tech-taxonomy` - Get tech skills taxonomy
-- `GET /career-paths` - Get career transition paths
-
-## 🧪 Testing
-
-Run the test suite:
-```bash
-pytest
+PowerShell (Windows):
+```powershell
+$Env:SNOWFLAKE_PASSWORD = "<your_password>"
 ```
 
-## 📈 Data Processing
+Bash (Linux/macOS):
+```bash
+export SNOWFLAKE_PASSWORD="<your_password>"
+```
 
-The system includes a data processor (`data/skills_processor.py`) that:
-- Filters job data for tech professionals
-- Extracts relevant skills using keyword matching
-- Creates comprehensive skills analysis
-- Supports multiple data sources (CSV files)
+Optional environment variables:
+- `MLFLOW_TRACKING_URI` (or pass via code to `create_model_manager`)
+- ClearML credentials (if using ClearML)
 
-## 🤝 Contributing
+## Run Locally
 
-This is a personal project showcasing skills in Data Engineering, Software Development, and Gen AI integration.
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd learning-recommender
+```
 
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-## 🔮 Roadmap
+3. (Optional) Ensure Snowflake password env var is set as above.
 
-- [ ] Integrate HuggingFace models for AI recommendations
-- [ ] Add Snowflake database integration
-- [ ] Implement user authentication
-- [ ] Add learning progress tracking
-- [ ] Create mobile app version
-- [ ] Add more career transition paths
-- [ ] Implement skill gap visualization
-- [ ] Add learning resource curation
+## Usage
+
+### Start services (Docker)
+```bash
+docker compose up --build
+```
+
+### Backend endpoints
+- `/health`: service health
+- `/metrics`: Prometheus metrics (counters, latency)
+- `/user/create`, `/profile/create`: create user and profile
+- `/recommend/path`: generate learning path
+- `/skills/tech-taxonomy`, `/skills/path`: skills endpoints
+
+Example requests (PowerShell):
+```powershell
+Invoke-RestMethod -Method GET http://localhost:8000/health
+
+$user = @{ username="alex"; email="alex@example.com"; experience_level="Intermediate"; target_role="ml_engineer" } | ConvertTo-Json
+Invoke-RestMethod -Method POST http://localhost:8000/user/create -ContentType "application/json" -Body $user
+
+$profile = @{ current_skills=@("python","sql"); learning_goals=@("mlops") } | ConvertTo-Json
+Invoke-RestMethod -Method POST "http://localhost:8000/profile/create?user_id=1" -ContentType "application/json" -Body $profile
+
+$recBody = @{ current_skills=@("python","sql") } | ConvertTo-Json
+Invoke-RestMethod -Method POST "http://localhost:8000/recommend/path?user_id=1" -ContentType "application/json" -Body $recBody
+```
+
+### Local dev without Docker
+
+Run backend:
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+Run frontend:
+```bash
+streamlit run frontend/app.py --server.port 8501
+```
+
+## CI/CD
+
+- GitHub Actions workflow `.github/workflows/ci.yml` runs lint, type checks, and tests on PRs and pushes.
+
+Pipeline steps:
+- flake8 (linting), mypy (type-checks), pytest (unit/integration)
+
+## MLOps Usage
+
+`mlops/model_manager.py` provides a `ModelManager` abstraction for model registration, tracking, deployment helper, and monitoring.
+
+Minimal example:
+```python
+from mlops.model_manager import create_model_manager, DeploymentEnvironment
+from sklearn.linear_model import LogisticRegression
+
+mm = create_model_manager({"mlflow_uri": "http://localhost:5000"})
+model = LogisticRegression().fit(X, y)
+model_id = mm.register_model(
+    model,
+    name="rec-scorer",
+    model_type="sklearn",
+    training_data_hash="hash123",
+    accuracy_metrics={"accuracy": 0.91, "f1_score": 0.88},
+    hyperparameters={"C": 1.0}
+)
+mm.deploy_model(model_id, environment=DeploymentEnvironment.DEVELOPMENT)
+perf = mm.monitor_model_performance(model_id)
+```
+
+Registry layout is stored under `models/registry/<name>/<version>/` with metadata JSON. MLflow and ClearML logging are invoked when available.
+
+## Real-time Prediction Service (optional)
+
+An async microservice scaffold exists at `services/real_time_prediction.py`:
+- High-level features: request queue, Redis cache (optional), simple load balancer, Prometheus metrics, Kafka-ready consumer/producer.
+
+Run locally:
+```bash
+uvicorn services.real_time_prediction:app --port 8002
+```
+
+Predict example (PowerShell):
+```powershell
+$body = @{ model_id="rec-scorer"; input_data=@{ text="learn mlops" }; priority="normal" } | ConvertTo-Json
+Invoke-RestMethod -Method POST http://localhost:8002/predict -ContentType "application/json" -Body $body
+```
+
+## Kubernetes (optional)
+
+- Deploy backend with manifests in `k8s/`:
+```bash
+kubectl apply -f k8s/backend-deployment.yaml
+kubectl apply -f k8s/backend-service.yaml
+```
+
+Default service exposes the backend on port 80 (target 8000) inside the cluster. Add an Ingress or NodePort/LoadBalancer for external access.
+
+## Monitoring & Observability
+
+- Prometheus exposition at `/metrics` (backend). Metrics include:
+  - `lr_requests_total{endpoint,method,http_status}`
+  - `lr_request_latency_seconds{endpoint}`
+- For the real-time service, additional metrics are exposed (queue size, cache ratio, latency) if you run that service.
+
+## Interview Talking Points (mapped to JD)
+
+- **CI/CD and testing**: GitHub Actions + pytest, flake8, mypy
+- **Docker & Kubernetes**: Dockerfile, docker-compose, K8s Deployment/Service
+- **REST & microservices**: FastAPI backend with clean endpoints; optional real-time service in `services/`
+- **Monitoring**: Prometheus `/metrics` with request counters and latency histograms
+- **SQL**: SQLAlchemy models and Snowflake integration in `config/database.py`
+- **NLP/ML**: Transformers-backed recommender with a skill dependency graph
+
+## Testing
+
+- Run tests locally:
+```bash
+pytest -q
+```
+
+## Notes
+
+- Secrets (e.g., Snowflake password) should be provided via environment variables.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Built with FastAPI, Streamlit, SQLAlchemy, HuggingFace Transformers.
