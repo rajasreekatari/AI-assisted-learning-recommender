@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -6,6 +6,7 @@ import uvicorn
 import sys
 import os
 from pathlib import Path
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
@@ -96,6 +97,33 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "learning-recommender"}
+
+# --- Minimal Prometheus metrics to support monitoring ---
+REQUEST_COUNT = Counter(
+    "lr_requests_total", "Total HTTP requests", ["endpoint", "method", "http_status"]
+)
+REQUEST_LATENCY = Histogram(
+    "lr_request_latency_seconds", "Request latency", ["endpoint"]
+)
+
+@app.middleware("http")
+async def add_metrics_middleware(request, call_next):
+    from time import perf_counter
+    start = perf_counter()
+    response = await call_next(request)
+    elapsed = perf_counter() - start
+    try:
+        endpoint = request.url.path
+        REQUEST_COUNT.labels(endpoint=endpoint, method=request.method, http_status=response.status_code).inc()
+        REQUEST_LATENCY.labels(endpoint=endpoint).observe(elapsed)
+    except Exception:
+        # Metrics must never break requests
+        pass
+    return response
+
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.post("/user/create", response_model=dict)
 async def create_user(user_data: UserCreateRequest):

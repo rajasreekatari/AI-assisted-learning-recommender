@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learning-recommender-backend
+  labels:
+    app: learning-recommender
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learning-recommender
+      tier: backend
+  template:
+    metadata:
+      labels:
+        app: learning-recommender
+        tier: backend
+    spec:
+      containers:
+        - name: backend
+          image: learning-recommender:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
