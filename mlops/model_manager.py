@@ -20,8 +20,14 @@ import mlflow.sklearn
 import mlflow.pytorch
 import mlflow.tensorflow
 from clearml import Task, Dataset, Model
-import tritonclient.http as tritonhttpclient
-import tritonclient.grpc as tritongrpcclient
+try:
+    import tritonclient.http as tritonhttpclient  # type: ignore
+    import tritonclient.grpc as tritongrpcclient  # type: ignore
+    _TRITON_AVAILABLE = True
+except Exception:  # ImportError or environment issues
+    tritonhttpclient = None  # type: ignore
+    tritongrpcclient = None  # type: ignore
+    _TRITON_AVAILABLE = False
 
 # Monitoring and Observability
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
@@ -399,7 +405,10 @@ class ModelManager:
         )
         
         # Deploy to Triton (if available)
-        self._deploy_to_triton(metadata, deployment_config)
+        if _TRITON_AVAILABLE:
+            self._deploy_to_triton(metadata, deployment_config)
+        else:
+            logger.info("Triton client not available; skipping Triton deployment step")
         
         # Update model status
         metadata.status = ModelStatus.DEPLOYED
@@ -419,11 +428,11 @@ class ModelManager:
         try:
             # This is a simplified deployment - in production, you'd use Triton's model repository
             # and proper model configuration files
-            
-            triton_client = tritonhttpclient.InferenceServerClient(
-                url=f"localhost:8000",
-                verbose=False
-            )
+            if not _TRITON_AVAILABLE or tritonhttpclient is None:
+                logger.info("Triton client not available in environment")
+                return
+
+            triton_client = tritonhttpclient.InferenceServerClient(url=f"localhost:8000", verbose=False)
             
             # Check if server is ready
             if not triton_client.is_server_ready():

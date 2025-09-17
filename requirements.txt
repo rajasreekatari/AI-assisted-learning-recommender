@@ -7,7 +7,9 @@ numpy>=1.24.0
 # MLOps and Model Management
 mlflow>=2.8.0
 clearml>=1.13.0
-triton-client>=2.40.0
+# Triton client is optional and not available on all Python versions in CI
+# Use the correct PyPI name and skip on Python >= 3.11
+tritonclient[http]>=2.40.0; python_version < "3.11"
 torch>=2.1.0
 tensorflow>=2.15.0
 
